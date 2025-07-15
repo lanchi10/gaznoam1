@@ -28,9 +28,15 @@
       color: white;
       border: none;
       border-radius: 5px;
+      cursor: pointer;
     }
     input[type="file"] {
       display: none;
+    }
+    img.preview {
+      width: 100%;
+      margin-top: 10px;
+      border: 1px solid #ccc;
     }
     table {
       width: 100%;
@@ -52,9 +58,11 @@
 
   <button onclick="document.getElementById('odo').click()">📸 צלמו את הספידומטר</button>
   <input type="file" accept="image/*" capture="environment" id="odo" onchange="processImage(event, 'odo')">
+  <img id="odoPreview" class="preview" style="display:none" alt="תצוגת הספידומטר">
 
   <button onclick="document.getElementById('receipt').click()">📸 צלמו את המשאבה</button>
   <input type="file" accept="image/*" capture="environment" id="receipt" onchange="processImage(event, 'receipt')">
+  <img id="receiptPreview" class="preview" style="display:none" alt="תצוגת המשאבה">
 
   <button onclick="saveEntry()">✅ אשרו ושמרו</button>
 
@@ -85,18 +93,35 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      Tesseract.recognize(file, 'eng')
-        .then(({ data: { text } }) => {
-          if (type === 'odo') {
-            const kmMatch = text.match(/\d{4,6}/);
-            odoNow = kmMatch ? parseInt(kmMatch[0]) : 0;
-          } else {
-            const litersMatch = text.match(/(\d{1,3}(\.\d+)?)[ ]?L/);
-            const priceMatch = text.match(/(\d{2,4}(\.\d+)?)[₪]/);
-            liters = litersMatch ? parseFloat(litersMatch[1]) : 0;
-            totalPrice = priceMatch ? parseFloat(priceMatch[1]) : 0;
-          }
-        });
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.src = e.target.result;
+
+        if (type === 'odo') {
+          document.getElementById('odoPreview').src = img.src;
+          document.getElementById('odoPreview').style.display = 'block';
+        } else {
+          document.getElementById('receiptPreview').src = img.src;
+          document.getElementById('receiptPreview').style.display = 'block';
+        }
+
+        Tesseract.recognize(img, 'eng')
+          .then(({ data: { text } }) => {
+            if (type === 'odo') {
+              const kmMatch = text.match(/\d{4,6}/);
+              odoNow = kmMatch ? parseInt(kmMatch[0]) : 0;
+              console.log("זיהוי ק" + 'מ: ' + odoNow);
+            } else {
+              const litersMatch = text.match(/(\d{1,3}(\.\d+)?)/);
+              const priceMatch = text.match(/(\d{2,4}(\.\d+)?)/g);
+              liters = litersMatch ? parseFloat(litersMatch[1]) : 0;
+              totalPrice = (priceMatch && priceMatch.length > 1) ? parseFloat(priceMatch[1]) : 0;
+              console.log("ליטרים: " + liters + ", סה" + 'כ מחיר: ' + totalPrice);
+            }
+          });
+      };
+      reader.readAsDataURL(file);
     }
 
     function saveEntry() {
