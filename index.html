@@ -34,9 +34,13 @@
       display: none;
     }
     img.preview {
-      width: 100%;
+      width: 200px;
+      height: auto;
       margin-top: 10px;
       border: 1px solid #ccc;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
     }
     input[type="number"] {
       width: 100%;
@@ -78,11 +82,12 @@
     <label>ליטרים (ניתן לתקן):</label>
     <input type="number" id="litersDisplay" placeholder="---" step="0.01">
 
-    <label>מחיר כולל (ש"&#8362;, ניתן לתקן):</label>
+    <label>מחיר כולל (ש"ח, ניתן לתקן):</label>
     <input type="number" id="priceDisplay" placeholder="---" step="0.01">
   </div>
 
   <button onclick="saveEntry()">✅ אשרו ושמרו</button>
+  <button onclick="resetForm()">🔁 איפוס</button>
 
   <table id="fuelTable">
     <thead>
@@ -119,13 +124,9 @@
       reader.onload = function(e) {
         const imageData = e.target.result;
 
-        if (type === 'odo') {
-          document.getElementById('odoPreview').src = imageData;
-          document.getElementById('odoPreview').style.display = 'block';
-        } else {
-          document.getElementById('receiptPreview').src = imageData;
-          document.getElementById('receiptPreview').style.display = 'block';
-        }
+        const imgElement = document.getElementById(type === 'odo' ? 'odoPreview' : 'receiptPreview');
+        imgElement.src = imageData;
+        imgElement.style.display = 'block';
 
         Tesseract.recognize(imageData, 'eng', { tessedit_char_whitelist: '0123456789.' })
           .then(({ data: { text } }) => {
@@ -176,6 +177,16 @@
       renderTable();
     }
 
+    function resetForm() {
+      document.getElementById('odoPreview').style.display = 'none';
+      document.getElementById('receiptPreview').style.display = 'none';
+      document.getElementById('odo').value = "";
+      document.getElementById('receipt').value = "";
+      document.getElementById('kmDisplay').value = "";
+      document.getElementById('litersDisplay').value = "";
+      document.getElementById('priceDisplay').value = "";
+    }
+
     function renderTable() {
       const tbody = document.querySelector("#fuelTable tbody");
       tbody.innerHTML = "";
@@ -201,7 +212,7 @@
         data: {
           labels: entries.map(e => e.date),
           datasets: [{
-            label: "צריכת דלק (ק\"מ לליטר)",
+            label: 'צריכת דלק (ק"מ לליטר)',
             data: entries.map(e => e.efficiency),
             borderWidth: 2
           }]
