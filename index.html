@@ -51,10 +51,10 @@
   <h1>אפליקציית תדלוק - גירסת נעם 1</h1>
 
   <button onclick="document.getElementById('odo').click()">📸 צלמו את הספידומטר</button>
-  <input type="file" accept="image/*" id="odo" onchange="processImage(event, 'odo')">
+  <input type="file" accept="image/*" capture="environment" id="odo" onchange="processImage(event, 'odo')">
 
   <button onclick="document.getElementById('receipt').click()">📸 צלמו את המשאבה</button>
-  <input type="file" accept="image/*" id="receipt" onchange="processImage(event, 'receipt')">
+  <input type="file" accept="image/*" capture="environment" id="receipt" onchange="processImage(event, 'receipt')">
 
   <button onclick="saveEntry()">✅ אשרו ושמרו</button>
 
