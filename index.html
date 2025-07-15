@@ -1,1 +1,219 @@
-SyntaxError: Uncaught SyntaxError: Unexpected identifier 'מ'
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>אפליקציית תדלוק - גירסת נעם 1</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f9fc;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      color: #007acc;
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      font-size: 18px;
+      margin: 10px 0;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    img.preview {
+      width: 100%;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 5px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    #stats, #recognizedValues {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>אפליקציית תדלוק - גירסת נעם 1</h1>
+
+  <button onclick="document.getElementById('odo').click()">📸 צלמו את הספידומטר</button>
+  <input type="file" accept="image/*" capture="environment" id="odo" onchange="processImage(event, 'odo')">
+  <img id="odoPreview" class="preview" style="display:none" alt="תצוגת הספידומטר">
+
+  <button onclick="document.getElementById('receipt').click()">📸 צלמו את המשאבה</button>
+  <input type="file" accept="image/*" capture="environment" id="receipt" onchange="processImage(event, 'receipt')">
+  <img id="receiptPreview" class="preview" style="display:none" alt="תצוגת המשאבה">
+
+  <div id="recognizedValues">
+    <label>ק"מ שזוהה (ניתן לתקן):</label>
+    <input type="number" id="kmDisplay" placeholder="---">
+
+    <label>ליטרים (ניתן לתקן):</label>
+    <input type="number" id="litersDisplay" placeholder="---" step="0.01">
+
+    <label>מחיר כולל (ש"&#8362;, ניתן לתקן):</label>
+    <input type="number" id="priceDisplay" placeholder="---" step="0.01">
+  </div>
+
+  <button onclick="saveEntry()">✅ אשרו ושמרו</button>
+
+  <table id="fuelTable">
+    <thead>
+      <tr>
+        <th>תאריך</th>
+        <th>ק"מ</th>
+        <th>ליטרים</th>
+        <th>מחיר כולל</th>
+        <th>מחיר לליטר</th>
+        <th>מרחק</th>
+        <th>ק"מ לליטר</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="stats">
+    <canvas id="chart" height="150"></canvas>
+  </div>
+
+  <script>
+    let entries = JSON.parse(localStorage.getItem("fuelData") || "[]");
+    let dateNow = new Date().toISOString().slice(0, 10);
+
+    function extractNumbers(text) {
+      return (text.replace(/[^\d.]/g, ' ').match(/\d+(\.\d+)?/g) || []).map(parseFloat).sort((a, b) => a - b);
+    }
+
+    function processImage(event, type) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const imageData = e.target.result;
+
+        if (type === 'odo') {
+          document.getElementById('odoPreview').src = imageData;
+          document.getElementById('odoPreview').style.display = 'block';
+        } else {
+          document.getElementById('receiptPreview').src = imageData;
+          document.getElementById('receiptPreview').style.display = 'block';
+        }
+
+        Tesseract.recognize(imageData, 'eng', { tessedit_char_whitelist: '0123456789.' })
+          .then(({ data: { text } }) => {
+            const numbers = extractNumbers(text);
+            if (type === 'odo' && numbers.length > 0) {
+              document.getElementById('kmDisplay').value = Math.floor(numbers[0]);
+            } else if (type === 'receipt') {
+              if (numbers.length >= 2) {
+                document.getElementById('litersDisplay').value = numbers[0];
+                document.getElementById('priceDisplay').value = numbers[numbers.length - 1];
+              } else if (numbers.length === 1) {
+                document.getElementById('litersDisplay').value = numbers[0];
+              }
+            }
+          })
+          .catch(error => {
+            alert("שגיאה בזיהוי התמונה. נסו שוב.");
+            console.error(error);
+          });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveEntry() {
+      const odoNow = parseFloat(document.getElementById('kmDisplay').value) || 0;
+      const liters = parseFloat(document.getElementById('litersDisplay').value) || 0;
+      const totalPrice = parseFloat(document.getElementById('priceDisplay').value) || 0;
+
+      if (!odoNow || !liters || !totalPrice) return alert("נא לצלם ולהשלים נתונים תקינים.");
+
+      const last = entries.length ? entries[entries.length - 1] : null;
+      const kmBefore = last ? last.km : odoNow;
+      const kmDiff = odoNow - kmBefore;
+      const pricePerLiter = (totalPrice / liters).toFixed(2);
+      const efficiency = kmDiff > 0 ? (kmDiff / liters).toFixed(2) : 0;
+
+      const entry = {
+        date: dateNow,
+        km: odoNow,
+        liters,
+        total: totalPrice,
+        perLiter: pricePerLiter,
+        kmDiff,
+        efficiency
+      };
+      entries.push(entry);
+      localStorage.setItem("fuelData", JSON.stringify(entries));
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.querySelector("#fuelTable tbody");
+      tbody.innerHTML = "";
+      entries.forEach(e => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${e.date}</td>
+            <td>${e.km}</td>
+            <td>${e.liters}</td>
+            <td>${e.total}</td>
+            <td>${e.perLiter}</td>
+            <td>${e.kmDiff}</td>
+            <td>${e.efficiency}</td>
+          </tr>`;
+      });
+      drawChart();
+    }
+
+    function drawChart() {
+      const ctx = document.getElementById("chart").getContext("2d");
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: entries.map(e => e.date),
+          datasets: [{
+            label: "צריכת דלק (ק"מ לליטר)",
+            data: entries.map(e => e.efficiency),
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    renderTable();
+  </script>
+</body>
+</html>
